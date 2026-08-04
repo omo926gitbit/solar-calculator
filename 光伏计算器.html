@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>光伏项目成本核算计算器</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --blue:       #1565C0;
+  --blue-light: #1E88E5;
+  --blue-pale:  #E3F2FD;
+  --green:      #2E7D32;
+  --green-light:#43A047;
+  --green-pale: #E8F5E9;
+  --white:      #FFFFFF;
+  --bg:         #F4F6F8;
+  --text:       #263238;
+  --text2:      #546E7A;
+  --border:     #E0E0E0;
+  --shadow:     0 2px 12px rgba(0,0,0,0.06);
+  --shadow-h:   0 6px 24px rgba(0,0,0,0.10);
+  --radius:     12px;
+  --gold:       #F9A825;
+  --red:        #D32F2F;
+  --orange:     #EF6C00;
+  --purple:     #8E24AA;
+  --teal:       #00897B;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: linear-gradient(135deg, var(--blue) 0%, #0D47A1 100%);
+  color: #fff; padding: 28px 20px 22px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.header::after {
+  content:''; position:absolute; top:-50%; right:-10%;
+  width:320px; height:320px;
+  background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.header h1 { font-size: clamp(1.3rem,2.8vw,1.9rem); font-weight:700; position:relative; z-index:1; }
+.header .subtitle { font-size: 0.84rem; opacity: 0.85; margin-top: 4px; position:relative; z-index:1; }
+
+/* ── Container ── */
+.container { max-width: 1260px; margin:0 auto; padding: 24px 16px 48px; }
+
+/* ── Card ── */
+.card {
+  background: var(--white); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 24px 28px; margin-bottom: 24px;
+  transition: box-shadow .2s;
+}
+.card:hover { box-shadow: var(--shadow-h); }
+.card-title {
+  font-size: 1.1rem; font-weight: 700; color: var(--blue);
+  margin-bottom: 20px; padding-bottom: 10px;
+  border-bottom: 2px solid var(--blue-pale);
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .icon { font-size: 1.25rem; }
+
+/* ── Section header with toggle ── */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  padding: 12px 0; margin-bottom: 4px;
+}
+.section-header h3 {
+  font-size: 1rem; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 6px;
+}
+.section-header .toggle-arrow {
+  font-size: 0.9rem; color: var(--blue-light); transition: transform .25s;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--blue-pale);
+}
+.section-header .toggle-arrow.open { transform: rotate(180deg); }
+.section-body { overflow: hidden; transition: max-height .35s ease, opacity .2s; }
+.section-body.collapsed { max-height: 0 !important; opacity: 0; }
+
+/* ── Input grid ── */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.input-group { position: relative; }
+.input-group label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.88rem; font-weight: 600; color: var(--text); margin-bottom: 5px;
+}
+.input-group label .unit { font-weight: 400; color: var(--text2); font-size: 0.78rem; }
+.input-row { display: flex; align-items: center; gap: 8px; }
+.input-row input, .input-row select {
+  flex: 1; padding: 9px 12px; border: 2px solid var(--border); border-radius: 8px;
+  font-size: 0.95rem; color: var(--text); background: var(--bg);
+  transition: border-color .2s, box-shadow .2s; min-width: 0;
+}
+.input-row input:focus, .input-row select:focus {
+  outline: none; border-color: var(--blue-light);
+  box-shadow: 0 0 0 3px rgba(30,136,229,0.13); background: #fff;
+}
+.info-btn {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--blue-light); background: #fff;
+  color: var(--blue-light); font-size: 0.82rem; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.info-btn:hover { background: var(--blue-light); color: #fff; }
+.input-hint { margin-top: 3px; font-size: 0.76rem; color: var(--text2); }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset:0; background: rgba(0,0,0,0.42); z-index: 1000;
+  display: flex; align-items: center; justify-content: center; animation: fadeIn .2s;
+}
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal-box {
+  background: #fff; border-radius: var(--radius); padding: 24px 28px;
+  max-width: 460px; width: 92%; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  animation: slideUp .25s;
+}
+@keyframes slideUp { from{transform:translateY(18px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-box h3 { font-size: 1.02rem; color: var(--blue); margin-bottom: 4px; }
+.modal-box .param-name { font-size: 0.8rem; color: var(--text2); margin-bottom: 12px; }
+.modal-box .source-list { list-style: none; }
+.modal-box .source-list li {
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+  font-size: 0.86rem; display: flex; align-items: flex-start; gap: 8px;
+}
+.modal-box .source-list li:last-child { border-bottom: none; }
+.modal-box .src-icon {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px;
+  background: var(--blue-pale); color: var(--blue);
+  display: flex; align-items: center; justify-content: center; font-size: 0.72rem;
+}
+.modal-close {
+  margin-top: 16px; width: 100%; padding: 10px; border: none; border-radius: 8px;
+  background: var(--blue); color: #fff; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: background .2s;
+}
+.modal-close:hover { background: var(--blue-light); }
+
+/* ── Tabs for results ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 18px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 7px 16px; border: 1.5px solid var(--border); border-radius: 20px;
+  background: #fff; font-size: 0.82rem; font-weight: 600; color: var(--text2);
+  cursor: pointer; transition: all .2s;
+}
+.tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.tab-btn:hover:not(.active) { border-color: var(--blue-light); color: var(--blue); }
+
+/* ── Results dashboard ── */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 14px;
+}
+.result-tile {
+  background: linear-gradient(135deg, var(--blue-pale), #BBDEFB);
+  border-radius: 10px; padding: 16px 14px; text-align: center;
+  transition: transform .2s, box-shadow .2s;
+  border-left: 4px solid var(--blue);
+}
+.result-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-h); }
+.result-tile.green-tile {
+  background: linear-gradient(135deg, var(--green-pale), #C8E6C9);
+  border-left-color: var(--green);
+}
+.result-tile.amber-tile {
+  background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+  border-left-color: var(--gold);
+}
+.result-tile .tile-label { font-size: 0.76rem; color: var(--text2); margin-bottom: 3px; font-weight: 500; }
+.result-tile .tile-value { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+.result-tile .tile-unit { font-size: 0.73rem; color: var(--text2); font-weight: 400; }
+
+/* ── Detail table ── */
+.detail-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.detail-table th, .detail-table td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--border); }
+.detail-table th { background: var(--blue-pale); color: var(--blue); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; text-align: center; }
+.detail-table td:first-child, .detail-table th:first-child { text-align: left; font-weight: 600; }
+.detail-table tr:hover td { background: #FAFAFA; }
+.detail-table .total-row td { font-weight: 700; border-top: 2px solid var(--blue); background: #F8FBFF; }
+.detail-table .sub-row td:first-child { padding-left: 24px; font-weight: 400; color: var(--text2); }
+
+/* ── Chart ── */
+.chart-wrapper { position: relative; max-width: 520px; margin: 0 auto; }
+.chart-wrapper canvas { max-height: 390px; }
+.cost-legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 14px; }
+.cost-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.83rem; }
+.cost-legend-dot { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Benchmark table ── */
+.benchmark-table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+.benchmark-table th, .benchmark-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.benchmark-table th { background: var(--blue-pale); color: var(--blue); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .5px; }
+.benchmark-table tr:hover td { background: #FAFAFA; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; white-space: nowrap; }
+.badge.good { background: #E8F5E9; color: #2E7D32; }
+.badge.neutral { background: #FFF8E1; color: #F57F17; }
+.badge.warn { background: #FFEBEE; color: #C62828; }
+
+/* ── Two col ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── Highlight callout ── */
+.callout {
+  background: #FFF8E1; border-left: 4px solid var(--gold);
+  padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 16px;
+  font-size: 0.83rem; color: #6D4C00;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .container { padding: 14px 8px 32px; }
+  .card { padding: 16px 12px; }
+  .input-grid { grid-template-columns: 1fr; }
+  .results-grid { grid-template-columns: repeat(2, 1fr); }
+  .result-tile .tile-value { font-size: 1.15rem; }
+}
+@media (max-width: 480px) {
+  .results-grid { grid-template-columns: 1fr 1fr; }
+  .header h1 { font-size: 1.15rem; }
+  .benchmark-table { font-size: 0.76rem; }
+  .benchmark-table th, .benchmark-table td { padding: 7px 5px; }
+}
+
+/* ── Footer ── */
+.footer { text-align: center; font-size: 0.76rem; color: var(--text2); padding: 8px 16px 20px; }
+
+/* ── Tab panels ── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════ Header ═════════════ -->
+<header class="header">
+  <h1>☀️ 光伏项目成本核算计算器</h1>
+  <p class="subtitle">基于 T/CPIA 0156-2026《光伏行业成本核算模型通则》&nbsp;&nbsp;|&nbsp;&nbsp;全生命周期财务模型</p>
+</header>
+
+<div class="container">
+
+<!-- ═════════════ 区域1：输入参数 ═════════════ -->
+<div class="card" id="input-section">
+  <h2 class="card-title"><span class="icon">📋</span> 输入参数</h2>
+
+  <!-- ── 基础参数（始终展开）── -->
+  <div class="section-header" onclick="toggleSection('sec-basic')">
+    <h3>🔧 基础参数</h3>
+    <span class="toggle-arrow" id="arrow-sec-basic">▾</span>
+  </div>
+  <div class="section-body" id="body-sec-basic">
+    <div class="input-grid">
+      <div class="input-group">
+        <label>装机容量 <span class="unit">(MWp)</span></label>
+        <div class="input-row">
+          <input type="number" id="capacity" value="100" min="0.01" step="any">
+          <button class="info-btn" onclick="openInfo('capacity')">ℹ</button>
+        </div>
+        <div class="input-hint">常见范围 1–1000 MWp</div>
+      </div>
+      <div class="input-group">
+        <label>光伏组件单价 <span class="unit">(元/W)</span></label>
+        <div class="input-row">
+          <input type="number" id="modulePrice" value="0.71" min="0.01" step="any">
+          <button class="info-btn" onclick="openInfo('modulePrice')">ℹ</button>
+        </div>
+        <div class="input-hint">参考2026年市场均价</div>
+      </div>
+      <div class="input-group">
+        <label>逆变器单价 <span class="unit">(元/W)</span></label>
+        <div class="input-row">
+          <input type="number" id="inverterPrice" value="0.076" min="0.001" step="any">
+          <button class="info-btn" onclick="openInfo('inverterPrice')">ℹ</button>
+        </div>
+        <div class="input-hint">含组串式/集中式逆变器及箱变</div>
+      </div>
+      <div class="input-group">
+        <label>建安工程费 <span class="unit">(元/W)</span></label>
+        <div class="input-row">
+          <input type="number" id="constructionPrice" value="1.20" min="0.01" step="any">
+          <button class="info-btn" onclick="openInfo('constructionPrice')">ℹ</button>
+        </div>
+        <div class="input-hint">含支架、基础、电气安装、土建等</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 配套成本（可折叠）── -->
+  <div class="section-header" onclick="toggleSection('sec-aux')">
+    <h3>🏗️ 配套成本</h3>
+    <span class="toggle-arrow" id="arrow-sec-aux">▾</span>
+  </div>
+  <div class="section-body" id="body-sec-aux">
+    <div class="input-grid">
+      <div class="input-group">
+        <label>土地费用 <span class="unit">(元/W)</span></label>
+        <div class="input-row">
+          <input type="number" id="landCost" value="0.18" min="0" step="any">
+          <button class="info-btn" onclick="openInfo('landCost')">ℹ</button>
+        </div>
+        <div class="input-hint">含征地/租赁、植被恢复、水土保持</div>
+      </div>
+      <div class="input-group">
+        <label>并网接入费 <span class="unit">(元/W)</span></label>
+        <div class="input-row">
+          <input type="number" id="gridCost" value="0.12" min="0" step="any">
+          <button class="info-btn" onclick="openInfo('gridCost')">ℹ</button>
+        </div>
+        <div class="input-hint">含升压站、送出线路、对侧间隔改造</div>
+      </div>
+      <div class="input-group">
+        <label>开发及其他费率 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="devRate" value="5" min="0" max="20" step="any">
+          <button class="info-btn" onclick="openInfo('devRate')">ℹ</button>
+        </div>
+        <div class="input-hint">含设计、可研、环评、管理、监理、保险、预备费等</div>
+      </div>
+      <div class="input-group">
+        <label>年均运维费 <span class="unit">(元/W/年)</span></label>
+        <div class="input-row">
+          <input type="number" id="omCost" value="0.045" min="0" step="any">
+          <button class="info-btn" onclick="openInfo('omCost')">ℹ</button>
+        </div>
+        <div class="input-hint">含组件清洗、设备检修、人工、保险等</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 财务与税费参数（可折叠）── -->
+  <div class="section-header" onclick="toggleSection('sec-fin')">
+    <h3>💰 财务与税费参数</h3>
+    <span class="toggle-arrow" id="arrow-sec-fin">▾</span>
+  </div>
+  <div class="section-body" id="body-sec-fin">
+    <div class="input-grid">
+      <div class="input-group">
+        <label>自有资金比例 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="equityRatio" value="20" min="0" max="100" step="any">
+          <button class="info-btn" onclick="openInfo('equityRatio')">ℹ</button>
+        </div>
+        <div class="input-hint">行业通常 20%–30%</div>
+      </div>
+      <div class="input-group">
+        <label>贷款年利率 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="loanRate" value="3.80" min="0" step="any">
+          <button class="info-btn" onclick="openInfo('loanRate')">ℹ</button>
+        </div>
+        <div class="input-hint">参考2026年LPR 5年期以上</div>
+      </div>
+      <div class="input-group">
+        <label>运营年限 <span class="unit">(年)</span></label>
+        <div class="input-row">
+          <input type="number" id="opYears" value="25" min="1" max="40" step="any">
+          <button class="info-btn" onclick="openInfo('opYears')">ℹ</button>
+        </div>
+        <div class="input-hint">光伏电站设计寿命通常 25 年</div>
+      </div>
+      <div class="input-group">
+        <label>折现率 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="discountRate" value="5.0" min="0" max="20" step="any">
+          <button class="info-btn" onclick="openInfo('discountRate')">ℹ</button>
+        </div>
+        <div class="input-hint">用于LCOE折现计算，参考行业WACC</div>
+      </div>
+      <div class="input-group">
+        <label>增值税率 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="vatRate" value="13" min="0" max="20" step="any">
+          <button class="info-btn" onclick="openInfo('vatRate')">ℹ</button>
+        </div>
+        <div class="input-hint">电力销售增值税标准税率</div>
+      </div>
+      <div class="input-group">
+        <label>所得税率 <span class="unit">(%)</span></label>
+        <div class="input-row">
+          <input type="number" id="incomeTaxRate" value="25" min="0" max="50" step="any">
+          <button class="info-btn" onclick="openInfo('incomeTaxRate')">ℹ</button>
+        </div>
+        <div class="input-hint">企业所得税标准税率（实际享受三免三减半优惠后有效税率约15%–20%）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 收益参数 ── -->
+  <div class="section-header" onclick="toggleSection('sec-rev')">
+    <h3>📈 收益参数</h3>
+    <span class="toggle-arrow" id="arrow-sec-rev">▾</span>
+  </div>
+  <div class="section-body" id="body-sec-rev">
+    <div class="input-grid">
+      <div class="input-group">
+        <label>年等效利用小时数 <span class="unit">(h)</span></label>
+        <div class="input-row">
+          <input type="number" id="utilHours" value="1300" min="1" step="any">
+          <button class="info-btn" onclick="openInfo('utilHours')">ℹ</button>
+        </div>
+        <div class="input-hint">全国加权平均约 1200–1300h，西北地区可达 1500h+</div>
+      </div>
+      <div class="input-group">
+        <label>上网电价 <span class="unit">(元/kWh)</span></label>
+        <div class="input-row">
+          <input type="number" id="feedInTariff" value="0.25" min="0.01" step="any">
+          <button class="info-btn" onclick="openInfo('feedInTariff')">ℹ</button>
+        </div>
+        <div class="input-hint">参考2026年各省燃煤基准价 0.23–0.30 元/kWh</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ 区域2：核算结果 ═════════════ -->
+<div class="card" id="results-section">
+  <h2 class="card-title"><span class="icon">📊</span> 核算结果</h2>
+
+  <!-- 标签切换 -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('dash')">📌 核心仪表板</button>
+    <button class="tab-btn" onclick="switchTab('detail')">📋 明细表</button>
+    <button class="tab-btn" onclick="switchTab('cashflow')">💵 现金流摘要</button>
+  </div>
+
+  <!-- 仪表板 -->
+  <div class="tab-panel active" id="panel-dash">
+    <div class="results-grid">
+      <div class="result-tile"><div class="tile-label">静态总投资</div><div class="tile-value" id="dash-staticInv">—</div><div class="tile-unit">万元</div></div>
+      <div class="result-tile amber-tile"><div class="tile-label">动态总投资</div><div class="tile-value" id="dash-dynamicInv">—</div><div class="tile-unit">万元（含建设期利息）</div></div>
+      <div class="result-tile"><div class="tile-label">静态单位瓦成本</div><div class="tile-value" id="dash-unitStatic">—</div><div class="tile-unit">元/W</div></div>
+      <div class="result-tile"><div class="tile-label">动态单位瓦成本</div><div class="tile-value" id="dash-unitDynamic">—</div><div class="tile-unit">元/W</div></div>
+      <div class="result-tile green-tile"><div class="tile-label">年均发电量</div><div class="tile-value" id="dash-annualGen">—</div><div class="tile-unit">万kWh</div></div>
+      <div class="result-tile green-tile"><div class="tile-label">年均发电收入</div><div class="tile-value" id="dash-annualRev">—</div><div class="tile-unit">万元</div></div>
+      <div class="result-tile"><div class="tile-label">年均净利润</div><div class="tile-value" id="dash-netProfit">—</div><div class="tile-unit">万元（税后）</div></div>
+      <div class="result-tile"><div class="tile-label">年均净现金流</div><div class="tile-value" id="dash-netCF">—</div><div class="tile-unit">万元</div></div>
+      <div class="result-tile amber-tile"><div class="tile-label">投资回收期（静态）</div><div class="tile-value" id="dash-paybackS">—</div><div class="tile-unit">年</div></div>
+      <div class="result-tile amber-tile"><div class="tile-label">投资回收期（动态）</div><div class="tile-value" id="dash-paybackD">—</div><div class="tile-unit">年</div></div>
+      <div class="result-tile green-tile"><div class="tile-label">LCOE（简单）</div><div class="tile-value" id="dash-lcoeSimple">—</div><div class="tile-unit">元/kWh</div></div>
+      <div class="result-tile green-tile"><div class="tile-label">LCOE（折现）</div><div class="tile-value" id="dash-lcoeDisc">—</div><div class="tile-unit">元/kWh（r=5%）</div></div>
+    </div>
+  </div>
+
+  <!-- 明细表 -->
+  <div class="tab-panel" id="panel-detail">
+    <table class="detail-table">
+      <thead><tr><th>项目</th><th>金额（万元）</th><th>占比</th><th>元/W</th></tr></thead>
+      <tbody>
+        <tr class="sub-row"><td>光伏组件</td><td id="det-module">—</td><td id="det-modulePct">—</td><td id="det-moduleW">—</td></tr>
+        <tr class="sub-row"><td>逆变器及箱变</td><td id="det-inverter">—</td><td id="det-inverterPct">—</td><td id="det-inverterW">—</td></tr>
+        <tr class="sub-row"><td>建安工程</td><td id="det-construct">—</td><td id="det-constructPct">—</td><td id="det-constructW">—</td></tr>
+        <tr class="sub-row"><td>土地费用</td><td id="det-land">—</td><td id="det-landPct">—</td><td id="det-landW">—</td></tr>
+        <tr class="sub-row"><td>并网接入</td><td id="det-grid">—</td><td id="det-gridPct">—</td><td id="det-gridW">—</td></tr>
+        <tr class="sub-row"><td>开发及其他费</td><td id="det-dev">—</td><td id="det-devPct">—</td><td id="det-devW">—</td></tr>
+        <tr class="total-row"><td>静态总投资（合计）</td><td id="det-staticTotal">—</td><td>100%</td><td id="det-staticTotalW">—</td></tr>
+        <tr class="sub-row"><td>建设期利息</td><td id="det-interest">—</td><td>—</td><td>—</td></tr>
+        <tr class="total-row"><td>动态总投资（含息）</td><td id="det-dynamicTotal">—</td><td>—</td><td id="det-dynamicTotalW">—</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      ℹ️ <strong>提示：</strong>行业典型地面光伏电站静态造价 2.50–2.80 元/W（2026年）。
+      动态造价含建设期利息后约 2.80–3.20 元/W。如您的结果偏离较大，请检查各成本项取值。
+    </div>
+  </div>
+
+  <!-- 现金流摘要 -->
+  <div class="tab-panel" id="panel-cashflow">
+    <table class="detail-table">
+      <thead><tr><th>项目</th><th>金额（万元）</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>年均发电收入</td><td id="cf-rev">—</td><td>发电量 × 上网电价</td></tr>
+        <tr><td>减：年均运维费</td><td id="cf-om">—</td><td>装机容量 × 运维单价</td></tr>
+        <tr><td>减：年均折旧</td><td id="cf-depr">—</td><td>静态总投资 ÷ 运营年限（直线折旧）</td></tr>
+        <tr><td>= 年均税前利润</td><td id="cf-pretax">—</td><td></td></tr>
+        <tr><td>减：年均所得税</td><td id="cf-tax">—</td><td>税前利润 × 所得税率（实际考虑三免三减半后更低）</td></tr>
+        <tr class="total-row"><td>= 年均净利润</td><td id="cf-profit">—</td><td></td></tr>
+        <tr class="total-row"><td>年均净现金流（=净利润+折旧）</td><td id="cf-netCF">—</td><td>用于回收期计算</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═════════════ 区域3 & 4：成本构成 + 对标  ═════════════ -->
+<div class="two-col">
+  <!-- 成本构成图 -->
+  <div class="card" id="chart-section">
+    <h2 class="card-title"><span class="icon">📈</span> 成本构成</h2>
+    <div class="chart-wrapper"><canvas id="costChart"></canvas></div>
+    <div class="cost-legend" id="chartLegend"></div>
+  </div>
+
+  <!-- 对标参考 -->
+  <div class="card" id="benchmark-section">
+    <h2 class="card-title"><span class="icon">🎯</span> 行业对标参考</h2>
+    <table class="benchmark-table">
+      <thead><tr><th>指标</th><th>行业参考值</th><th>您的测算</th><th>对比</th></tr></thead>
+      <tbody>
+        <tr><td>组件市场均价</td><td>0.71 元/W</td><td id="bm-module">—</td><td id="bm-module-badge">—</td></tr>
+        <tr><td>静态单位瓦造价</td><td>2.50–2.80 元/W</td><td id="bm-static">—</td><td id="bm-static-badge">—</td></tr>
+        <tr><td>动态单位瓦造价</td><td>2.80–3.20 元/W</td><td id="bm-dynamic">—</td><td id="bm-dynamic-badge">—</td></tr>
+        <tr><td>年利用小时数</td><td>1,200–1,340 h</td><td id="bm-hours">—</td><td id="bm-hours-badge">—</td></tr>
+        <tr><td>LCOE（集中式）</td><td>0.15–0.25 元/kWh</td><td id="bm-lcoe">—</td><td id="bm-lcoe-badge">—</td></tr>
+        <tr><td>投资回收期</td><td>8–12 年</td><td id="bm-payback">—</td><td id="bm-payback-badge">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /.container -->
+
+<div class="footer">
+  ⚠️ 数据仅供参考，实际项目请以专业机构测算为准 &nbsp;|&nbsp; 标准依据：T/CPIA 0156-2026 &nbsp;|&nbsp; 税费按标准税率计算，实际享受"三免三减半"等优惠政策
+</div>
+
+<!-- ═════════════ Modal ═════════════ -->
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+
+<script>
+// ═══════════════════════ 信息来源数据 ═══════════════════════
+const infoSources = {
+  capacity: { title:'装机容量', param:'MWp', sources:[
+    {icon:'📄',text:'项目备案文件 / 发改委核准批复'},
+    {icon:'🏗️',text:'项目可研报告 / 接入系统方案'},
+    {icon:'🏛️',text:'省级能源主管部门年度建设方案'},
+    {icon:'🌐',text:'全国投资项目在线审批监管平台'},
+  ]},
+  modulePrice: { title:'光伏组件单价', param:'元/W', sources:[
+    {icon:'📊',text:'PV InfoLink / 集邦新能源网 每周现货报价'},
+    {icon:'🏭',text:'中国光伏行业协会（CPIA）季度供应链报告'},
+    {icon:'📋',text:'各大电力集团组件集中采购中标公示'},
+    {icon:'🌐',text:'中国招投标公共服务平台'},
+  ]},
+  inverterPrice: { title:'逆变器单价', param:'元/W', sources:[
+    {icon:'📊',text:'华为、阳光电源等主流企业公开报价'},
+    {icon:'📋',text:'电力央企逆变器框架采购中标结果'},
+    {icon:'🏭',text:'CPIA 年度光伏产业发展报告'},
+    {icon:'🌐',text:'中国采购与招标网'},
+  ]},
+  constructionPrice: { title:'建安工程费', param:'元/W', sources:[
+    {icon:'📐',text:'电力建设工程预算定额（2023版）'},
+    {icon:'📋',text:'各电力设计院典型工程造价分析报告'},
+    {icon:'🏗️',text:'已投产项目 EPC 总承包合同价（去敏后）'},
+    {icon:'📊',text:'中国电力企业联合会（CEC）造价信息年报'},
+    {icon:'💡',text:'含支架（0.25-0.35）、基础（0.15-0.25）、电气安装（0.30-0.40）、土建（0.15-0.25）元/W'},
+  ]},
+  landCost: { title:'土地费用', param:'元/W', sources:[
+    {icon:'🏛️',text:'当地自然资源局征地补偿标准文件'},
+    {icon:'📋',text:'光伏项目用地租金参考：农光互补 800-1500 元/亩·年'},
+    {icon:'📐',text:'水土保持方案编制及植被恢复费标准'},
+    {icon:'🌐',text:'各省公共资源交易中心土地出让公告'},
+  ]},
+  gridCost: { title:'并网接入费', param:'元/W', sources:[
+    {icon:'⚡',text:'国家电网/南方电网接入系统批复'},
+    {icon:'📋',text:'升压站（含主变、GIS、SVG等）工程预算'},
+    {icon:'🔌',text:'送出线路工程概算（按km计）'},
+    {icon:'🏛️',text:'对侧间隔改造费用依据变电站扩建定额'},
+  ]},
+  devRate: { title:'开发及其他费率', param:'%', sources:[
+    {icon:'📐',text:'电力工程勘察设计收费标准（2023版）'},
+    {icon:'📋',text:'环评、水保、安评、职业病等专项报告编制费'},
+    {icon:'🛡️',text:'工程监理、项目管理、工程保险等费率标准'},
+    {icon:'💡',text:'行业通常占直接成本的 3%–8%'},
+  ]},
+  omCost: { title:'年均运维费', param:'元/W/年', sources:[
+    {icon:'🔧',text:'光伏电站运维合同价：通常 0.03–0.06 元/W/年'},
+    {icon:'📊',text:'CPIA 运维成本调研报告'},
+    {icon:'🧹',text:'含组件清洗、设备巡检、预防性试验、备品备件'},
+    {icon:'🛡️',text:'财产一切险、机器损坏险费率约 0.08%–0.12%'},
+  ]},
+  equityRatio: { title:'自有资金比例', param:'%', sources:[
+    {icon:'🏦',text:'国家能源局关于可再生能源项目资本金制度'},
+    {icon:'📋',text:'国务院关于固定资产投资项目资本金比例规定（最低20%）'},
+    {icon:'💡',text:'央企通常 20%–25%，民企通常 25%–30%'},
+  ]},
+  loanRate: { title:'贷款年利率', param:'%', sources:[
+    {icon:'🏦',text:'中国人民银行授权全国银行间同业拆借中心 LPR 报价'},
+    {icon:'📊',text:'各大银行绿色信贷专项利率（通常LPR下浮10–50bp）'},
+    {icon:'💡',text:'2026年 5年期以上LPR约 3.60%–3.85%，绿贷优惠后约 3.20%–3.60%'},
+  ]},
+  opYears: { title:'运营年限', param:'年', sources:[
+    {icon:'📋',text:'光伏组件设计寿命 25–30 年（厂家质保书）'},
+    {icon:'🔬',text:'IEC 61215/61730 组件可靠性测试标准'},
+    {icon:'💡',text:'行业通常按 25 年进行财务测算'},
+  ]},
+  discountRate: { title:'折现率', param:'%', sources:[
+    {icon:'📊',text:'光伏行业加权平均资金成本（WACC）约 4%–7%'},
+    {icon:'🏦',text:'国家发改委、国家能源局发布的新能源基准收益率'},
+    {icon:'💡',text:'国企通常取 5%–6%，民企通常取 6%–8%'},
+  ]},
+  vatRate: { title:'增值税率', param:'%', sources:[
+    {icon:'🏛️',text:'《增值税暂行条例》电力销售税率 13%'},
+    {icon:'📋',text:'财税〔2008〕156号：光伏发电增值税即征即退50%政策（不定期延续）'},
+    {icon:'💡',text:'即征即退50%后实际税率约 6.5%（视政策有效期）'},
+  ]},
+  incomeTaxRate: { title:'所得税率', param:'%', sources:[
+    {icon:'🏛️',text:'《企业所得税法》法定税率 25%'},
+    {icon:'📋',text:'财税〔2008〕46号：公共基础设施项目三免三减半'},
+    {icon:'💡',text:'第1–3年免征、第4–6年减半（12.5%）、第7年起25%；25年有效税率约 18%–21%'},
+  ]},
+  utilHours: { title:'年等效利用小时数', param:'h', sources:[
+    {icon:'☀️',text:'中国气象局风能太阳能资源中心 / Solargis 辐照数据'},
+    {icon:'📊',text:'国家能源局年度光伏发电并网运行统计'},
+    {icon:'🗺️',text:'NASA POWER / Global Solar Atlas 免费数据库'},
+    {icon:'🔬',text:'项目地实测辐照数据（至少一个完整年）'},
+  ]},
+  feedInTariff: { title:'上网电价', param:'元/kWh', sources:[
+    {icon:'🏛️',text:'各省发改委发布的燃煤基准价文件（2026年）'},
+    {icon:'⚡',text:'电力市场化交易月度/年度长协成交均价'},
+    {icon:'📊',text:'北京/广州电力交易中心月度报告'},
+    {icon:'💡',text:'2026年各省燃煤基准价约 0.23（新疆）–0.30（广东）元/kWh'},
+  ]},
+};
+
+// ═══════════════════════ 折叠/展开 ═══════════════════════
+function toggleSection(id) {
+  const body = document.getElementById('body-'+id);
+  const arrow = document.getElementById('arrow-'+id);
+  const isOpen = !body.classList.contains('collapsed');
+  if (isOpen) {
+    body.style.maxHeight = body.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      body.classList.add('collapsed');
+      body.style.maxHeight = '0px';
+    });
+    arrow.classList.remove('open');
+  } else {
+    body.classList.remove('collapsed');
+    body.style.maxHeight = body.scrollHeight + 'px';
+    arrow.classList.add('open');
+    // 动画结束后解除高度限制，避免内容增长后被截断
+    body.addEventListener('transitionend', function handler() {
+      body.style.maxHeight = 'none';
+      body.removeEventListener('transitionend', handler);
+    });
+  }
+}
+
+// ═══════════════════════ Tab 切换 ═══════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  // 找到对应按钮并激活
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.textContent.includes({dash:'仪表板', detail:'明细表', cashflow:'现金流'}[name])) b.classList.add('active');
+  });
+}
+
+// ═══════════════════════ 获取输入值 ═══════════════════════
+function getVal(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+// ═══════════════════════ 核心计算 ═══════════════════════
+function calculate() {
+  const cap        = getVal('capacity');          // MWp
+  const modPrice   = getVal('modulePrice');       // 元/W
+  const invPrice   = getVal('inverterPrice');     // 元/W
+  const consPrice  = getVal('constructionPrice'); // 元/W
+  const landPrice  = getVal('landCost');          // 元/W
+  const gridPrice  = getVal('gridCost');          // 元/W
+  const devPct     = getVal('devRate') / 100;
+  const omPrice    = getVal('omCost');            // 元/W/年
+  const equityPct  = getVal('equityRatio') / 100;
+  const loanPct    = 1 - equityPct;
+  const loanRate   = getVal('loanRate') / 100;
+  const opYrs      = getVal('opYears');
+  const discRate   = getVal('discountRate') / 100;
+  const vatPct     = getVal('vatRate') / 100;
+  const taxPct     = getVal('incomeTaxRate') / 100;
+  const utilHrs    = getVal('utilHours');
+  const tariff     = getVal('feedInTariff');
+
+  const MW_TO_W = 1_000_000;
+  const WAN = 10_000; // 万元转换
+
+  // ── 各项成本（元）──
+  const moduleCost     = cap * MW_TO_W * modPrice;
+  const inverterCost   = cap * MW_TO_W * invPrice;
+  const constructCost  = cap * MW_TO_W * consPrice;
+  const landTotalCost  = cap * MW_TO_W * landPrice;
+  const gridTotalCost  = cap * MW_TO_W * gridPrice;
+  const directCost     = moduleCost + inverterCost + constructCost + landTotalCost + gridTotalCost;
+  const devCost        = directCost * devPct;
+  const staticInv      = directCost + devCost;           // 静态总投资
+
+  // 建设期利息（假设建设期1年，平均资金占用0.5年）
+  const debtAmt        = staticInv * loanPct;
+  const constrInterest = debtAmt * loanRate * 0.5;
+  const dynamicInv     = staticInv + constrInterest;     // 动态总投资
+
+  // 单位瓦
+  const unitStatic     = cap > 0 ? staticInv  / (cap * MW_TO_W) : 0;
+  const unitDynamic    = cap > 0 ? dynamicInv / (cap * MW_TO_W) : 0;
+
+  // ── 发电与收入 ──
+  const annualGen      = cap * 1000 * utilHrs;           // kWh
+  const annualRevenue  = annualGen * tariff;
+
+  // ── 运营成本与税费 ──
+  const annualOM       = cap * MW_TO_W * omPrice;
+  const annualDepr     = staticInv / opYrs;               // 直线折旧
+  const pretaxProfit   = Math.max(0, annualRevenue - annualOM - annualDepr);
+  const annualTax      = pretaxProfit * taxPct;
+  const netProfit      = pretaxProfit - annualTax;
+  const netCashFlow    = netProfit + annualDepr;         // 经营净现金流
+
+  // ── 回收期 ──
+  const paybackStatic  = netCashFlow > 0 ? staticInv  / netCashFlow : Infinity;
+  const paybackDynamic = netCashFlow > 0 ? dynamicInv / netCashFlow : Infinity;
+
+  // ── LCOE ──
+  // 简单LCOE（无折现）
+  const lcoeSimple = (annualGen * opYrs > 0)
+    ? (dynamicInv + annualOM * opYrs) / (annualGen * opYrs)
+    : Infinity;
+
+  // 折现LCOE（标准公式）
+  let lcoeDisc = Infinity;
+  if (discRate === 0) {
+    lcoeDisc = lcoeSimple;
+  } else if (annualGen > 0 && opYrs > 0) {
+    const af = (1 - Math.pow(1 + discRate, -opYrs)) / discRate; // 年金因子
+    lcoeDisc = (dynamicInv + annualOM * af) / (annualGen * af);
+  }
+
+  // ═══════════════ 更新仪表板 ═══════════════
+  setVal('dash-staticInv',    staticInv  > 0 ? (staticInv  / WAN).toFixed(2) : '—');
+  setVal('dash-dynamicInv',   dynamicInv > 0 ? (dynamicInv / WAN).toFixed(2) : '—');
+  setVal('dash-unitStatic',   unitStatic  > 0 ? unitStatic.toFixed(2)  : '—');
+  setVal('dash-unitDynamic',  unitDynamic > 0 ? unitDynamic.toFixed(2) : '—');
+  setVal('dash-annualGen',    annualGen   > 0 ? (annualGen   / WAN).toFixed(2) : '—');
+  setVal('dash-annualRev',    annualRevenue > 0 ? (annualRevenue / WAN).toFixed(2) : '—');
+  setVal('dash-netProfit',    netProfit   > 0 ? (netProfit   / WAN).toFixed(2) : (netProfit<0?'—':(0).toFixed(2)));
+  setVal('dash-netCF',        netCashFlow > 0 ? (netCashFlow / WAN).toFixed(2) : '—');
+  setVal('dash-paybackS',     isFinite(paybackStatic)  ? paybackStatic.toFixed(1)  : '—');
+  setVal('dash-paybackD',     isFinite(paybackDynamic) ? paybackDynamic.toFixed(1) : '—');
+  setVal('dash-lcoeSimple',   isFinite(lcoeSimple) ? lcoeSimple.toFixed(4)   : '—');
+  setVal('dash-lcoeDisc',     isFinite(lcoeDisc)   ? lcoeDisc.toFixed(4)     : '—');
+
+  // ═══════════════ 更新明细表 ═══════════════
+  const items = [
+    { id:'module',    v: moduleCost,    w: modPrice },
+    { id:'inverter',  v: inverterCost,  w: invPrice },
+    { id:'construct', v: constructCost, w: consPrice },
+    { id:'land',      v: landTotalCost, w: landPrice },
+    { id:'grid',      v: gridTotalCost, w: gridPrice },
+    { id:'dev',       v: devCost,       w: 0 },
+  ];
+  const devW = staticInv > 0 ? (devCost / (cap * MW_TO_W)) : 0;
+
+  items.forEach(it => {
+    const w = it.id === 'dev' ? devW : it.w;
+    setVal('det-'+it.id,    it.v > 0 ? (it.v / WAN).toFixed(2) : '—');
+    setVal('det-'+it.id+'W', it.id !== 'dev' ? (it.w > 0 ? it.w.toFixed(2) : '—') : (devW > 0 ? devW.toFixed(2) : '—'));
+  });
+  // 占比
+  items.forEach(it => {
+    const pct = staticInv > 0 ? (it.v / staticInv * 100) : 0;
+    setVal('det-'+it.id+'Pct', staticInv > 0 ? pct.toFixed(1)+'%' : '—');
+  });
+
+  setVal('det-staticTotal',     staticInv > 0 ? (staticInv / WAN).toFixed(2) : '—');
+  setVal('det-staticTotalW',    unitStatic > 0 ? unitStatic.toFixed(2) : '—');
+  setVal('det-interest',        constrInterest > 0 ? (constrInterest / WAN).toFixed(2) : '—');
+  setVal('det-dynamicTotal',    dynamicInv > 0 ? (dynamicInv / WAN).toFixed(2) : '—');
+  setVal('det-dynamicTotalW',   unitDynamic > 0 ? unitDynamic.toFixed(2) : '—');
+
+  // ═══════════════ 更新现金流 ═══════════════
+  setVal('cf-rev',    annualRevenue > 0 ? (annualRevenue / WAN).toFixed(2) : '—');
+  setVal('cf-om',     annualOM > 0 ? (annualOM / WAN).toFixed(2) : '—');
+  setVal('cf-depr',   annualDepr > 0 ? (annualDepr / WAN).toFixed(2) : '—');
+  setVal('cf-pretax', (pretaxProfit / WAN).toFixed(2));
+  setVal('cf-tax',    (annualTax / WAN).toFixed(2));
+  setVal('cf-profit', netProfit > 0 ? (netProfit / WAN).toFixed(2) : (netProfit < 0 ? '—' : '0.00'));
+  setVal('cf-netCF',  netCashFlow > 0 ? (netCashFlow / WAN).toFixed(2) : '—');
+
+  // ═══════════════ 对标参考（6项） ═══════════════
+  // 1. 组件单价 vs 0.71
+  bench(modPrice, 0.71, 0.71, 'bm-module', 'bm-module-badge', false);
+  // 2. 静态造价 vs 2.50-2.80
+  benchRange(unitStatic, 2.50, 2.80, 'bm-static', 'bm-static-badge', false);
+  // 3. 动态造价 vs 2.80-3.20
+  benchRange(unitDynamic, 2.80, 3.20, 'bm-dynamic', 'bm-dynamic-badge', false);
+  // 4. 利用小时数 vs 1200-1340
+  benchRange(utilHrs, 1200, 1340, 'bm-hours', 'bm-hours-badge', true);
+  // 5. LCOE(折现) vs 0.15-0.25
+  benchRange(lcoeDisc, 0.15, 0.25, 'bm-lcoe', 'bm-lcoe-badge', false);
+  // 6. 回收期(动态) vs 8-12
+  benchRange(paybackDynamic, 8, 12, 'bm-payback', 'bm-payback-badge', true);
+
+  // ═══════════════ 更新图表 ═══════════════
+  updateChart(moduleCost, inverterCost, constructCost, landTotalCost, gridTotalCost, devCost, constrInterest, staticInv);
+}
+
+function bench(val, ref, ref2, idTd, idBadge, higherBetter) {
+  document.getElementById(idTd).textContent = val > 0 ? val.toFixed(2) : '—';
+  if (val > 0) {
+    let cls, txt;
+    if (higherBetter) {
+      if (val > ref)       { cls='good'; txt='✓ 优于参考'; }
+      else if (val >= ref2){ cls='neutral'; txt='≈ 持平'; }
+      else                 { cls='warn'; txt='⚠ 低于参考'; }
+    } else {
+      if (val < ref)       { cls='good'; txt='✓ 优于参考'; }
+      else if (val <= ref2){ cls='neutral'; txt='≈ 持平'; }
+      else                 { cls='warn'; txt='⚠ 高于参考'; }
+    }
+    document.getElementById(idBadge).innerHTML = `<span class="badge ${cls}">${txt}</span>`;
+  } else { document.getElementById(idBadge).textContent = '—'; }
+}
+
+function benchRange(val, lo, hi, idTd, idBadge, higherBetter) {
+  document.getElementById(idTd).textContent = val > 0 ? val.toFixed(2) : '—';
+  if (val > 0) {
+    let cls, txt;
+    if (higherBetter) {
+      if (val > hi)         { cls='good'; txt='✓ 优于参考'; }
+      else if (val >= lo)   { cls='neutral'; txt='≈ 区间内'; }
+      else                  { cls='warn'; txt='⚠ 低于区间'; }
+    } else {
+      if (val < lo)         { cls='good'; txt='✓ 优于参考'; }
+      else if (val <= hi)   { cls='neutral'; txt='≈ 区间内'; }
+      else                  { cls='warn'; txt='⚠ 高于区间'; }
+    }
+    document.getElementById(idBadge).innerHTML = `<span class="badge ${cls}">${txt}</span>`;
+  } else { document.getElementById(idBadge).textContent = '—'; }
+}
+
+function setVal(id, text) { document.getElementById(id).textContent = text; }
+
+// ═══════════════════════ Chart.js ═══════════════════════
+let chartInstance = null;
+const CHART_COLORS = ['#1565C0','#43A047','#F9A825','#EF6C00','#8E24AA','#00897B','#EF5350'];
+const CHART_LABELS = ['光伏组件','逆变器及箱变','建安工程','土地费用','并网接入','开发及其他费','建设期利息'];
+
+function updateChart(moduleCost, inverterCost, constructCost, landCost, gridCost, devCost, constrInterest, total) {
+  const ctx = document.getElementById('costChart').getContext('2d');
+  const data = [moduleCost, inverterCost, constructCost, landCost, gridCost, devCost, constrInterest];
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  // 更新图例
+  const legendDiv = document.getElementById('chartLegend');
+  if (total <= 0) {
+    legendDiv.innerHTML = '<span style="color:#999">请填写参数后生成图表</span>';
+    chartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: ['暂无数据'], datasets:[{ data:[1], backgroundColor:['#E0E0E0'], borderWidth:0 }] },
+      options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{display:false}, tooltip:{enabled:false} } }
+    });
+    return;
+  }
+
+  let legendHtml = '';
+  data.forEach((v, i) => {
+    const pct = total > 0 ? (v/total*100).toFixed(1) : 0;
+    legendHtml += `<div class="cost-legend-item"><span class="cost-legend-dot" style="background:${CHART_COLORS[i]};"></span>${CHART_LABELS[i]} ${pct}%</div>`;
+  });
+  legendDiv.innerHTML = legendHtml;
+
+  chartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: CHART_LABELS,
+      datasets: [{
+        data: data,
+        backgroundColor: CHART_COLORS,
+        borderColor: '#FFFFFF',
+        borderWidth: 3,
+        hoverBorderWidth: 4,
+        hoverBorderColor: '#FFFFFF',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const val = ctx.raw;
+              const pct = total > 0 ? ((val/total)*100).toFixed(1) : 0;
+              const wan = (val / 10_000).toFixed(2);
+              return ctx.label + ': ' + wan + ' 万元 (' + pct + '%)';
+            }
+          }
+        }
+      },
+    }
+  });
+}
+
+// ═══════════════════════ Modal ═══════════════════════
+function openInfo(key) {
+  const info = infoSources[key];
+  if (!info) return;
+  const overlay = document.getElementById('modalOverlay');
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `
+    <h3>📖 信息来源</h3>
+    <p class="param-name">${info.title}（${info.param}）—— 建议从以下公开渠道获取：</p>
+    <ul class="source-list">${info.sources.map(s => `<li><span class="src-icon">${s.icon}</span>${s.text}</li>`).join('')}</ul>
+    <button class="modal-close" onclick="closeInfo()">关闭</button>
+  `;
+  overlay.style.display = 'flex';
+}
+function closeInfo() { document.getElementById('modalOverlay').style.display = 'none'; }
+document.getElementById('modalOverlay').addEventListener('click', function(e) { if (e.target === this) closeInfo(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeInfo(); });
+
+// ═══════════════════════ 初始化 ═══════════════════════
+// 设置各分组初始展开状态
+function initSections() {
+  const sections = ['sec-basic','sec-aux','sec-fin','sec-rev'];
+  sections.forEach(id => {
+    const body = document.getElementById('body-'+id);
+    const arrow = document.getElementById('arrow-'+id);
+    body.style.maxHeight = 'none';
+    body.classList.remove('collapsed');
+    arrow.classList.add('open');
+  });
+}
+
+// 监听所有输入
+document.querySelectorAll('input[type="number"]').forEach(inp => {
+  inp.addEventListener('input', calculate);
+});
+
+initSections();
+calculate();
+</script>
+</body>
+</html>
